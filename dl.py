@@ -3,11 +3,11 @@
 
 
 from selenium import webdriver
-from pathlib import Path  # 絶対パスを簡単に取得できるように
+from pathlib import Path
 import time
 import glob
-import json
 import shutil
+from queue import Queue
 
 
 class Downloader:
@@ -49,9 +49,9 @@ class Downloader:
         self.downloading_count = 0
 
         # ディレクトリを作る
-        self.incomplete_directory.mkdir(exist_ok=True)  # 存在していてもOKとする（エラーで止めない）            
-        self.download_directory.mkdir(exist_ok=True)  # 存在していてもOKとする（エラーで止めない）
-        self.profile_directory.mkdir(exist_ok=True)  # 存在していてもOKとする（エラーで止めない）
+        self.incomplete_directory.mkdir(exist_ok=True)        
+        self.download_directory.mkdir(exist_ok=True)
+        self.profile_directory.mkdir(exist_ok=True)
 
         # ドライバのセットアップ
         self.driver = self.setUpDriver(
@@ -130,22 +130,6 @@ class Downloader:
         """
         self.driver.get(url)
 
-    def loadQueue(self, path):
-        """ 
-        Queueをロードする
-        """
-        data = None
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data
-
-    def saveQueue(self, data, path):
-        """
-        Queueをセーブする
-        """
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-
     def moveToDownloadDirectory(self, incomplete_path):
         """
         ファイルをincompleteからdownloadに移動する
@@ -165,39 +149,29 @@ class Downloader:
         queue_file: str
             キューファイルのパス      
         """
-        data = self.loadQueue(queue_file)
+        queue = Queue(queue_file)
         self.login()
 
-        while len(data["queue"]) >= 1 or len(data["downloading"]) >= 1:
-            if self.downloading_count == 0 and len(data["queue"]) >= 1:
+        while not queue.finished:
+            if self.downloading_count == 0 and queue.hasQueue:
                 # ダウンロードに追加
                 self.downloading_count += 1    
-                url = data["queue"].pop(0)     
-                data["downloading"].append(url)
+                url = queue.next()
+                queue.save()
                 self.fromURL(url)
-                self.saveQueue(data, queue_file)
 
             for item in self.finishedItems:
                 # ダウンロード完了時処理
-                self.downloading_count -= 1
-                basename = Path(item).name
-                for url in data["downloading"]:
-                    if(basename in url):
-                        data["downloading"].remove(url)
-                        data["finished"].append(url)
-                        break
+                self.downloading_count -= 1                
                 self.moveToDownloadDirectory(item)
-                self.saveQueue(data, queue_file)
+                url = queue.findFromDownloading(Path(item).name)
+                queue.toFinished(url)
+                queue.save()
             time.sleep(1)
 
     def idle(self):
         """
-        ブラウザを起動したまま待機する
-
-        Parameters
-        ----------------
-        queue_file: str
-            キューファイルのパス      
+        ブラウザを起動したまま待機する  
         """
         self.login()
 
