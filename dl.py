@@ -190,6 +190,20 @@ class Downloader:
                 self.saveQueue(data, queue_file)
             time.sleep(1)
 
+    def idle(self):
+        """
+        ブラウザを起動したまま待機する
+
+        Parameters
+        ----------------
+        queue_file: str
+            キューファイルのパス      
+        """
+        self.login()
+
+        while True:
+            time.sleep(1)
+
     def __del__(self):
         """
         デストラクタでドライバーを開放する

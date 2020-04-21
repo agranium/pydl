@@ -38,6 +38,18 @@ def down(ctx, queue_file):
 
 
 @cmd.command()
+@click.pass_context
+def idle(ctx):
+    down = dl.Downloader(
+        ctx.obj["incomplete"],
+        ctx.obj["download"],
+        ctx.obj["profile"],
+        ctx.obj["headless"]
+        )
+    down.idle()
+
+
+@cmd.command()
 @click.argument('queue_file', nargs=1)
 @click.pass_context
 def init(ctx, queue_file):
